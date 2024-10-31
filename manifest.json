@@ -1,0 +1,7 @@
+{
+  "name": "hexafield/fps-game",
+  "version": "0.0.0",
+  "engineVersion": "1.6.0",
+  "description": "The default project for iR Engine",
+  "thumbnail": "/static/IR_thumbnail.jpg"
+}

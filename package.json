@@ -1,0 +1,23 @@
+{
+  "name": "@hexafield/fps-game",
+  "version": "0.0.0",
+  "scripts": {
+    "test": "cross-env TEST=true vitest run",
+    "check-errors": "tsc --noemit",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "format-scss": "stylelint \"**/*.scss\" --fix",
+    "format-staged": "lint-staged"
+  },
+  "license": "ISC",
+  "pre-commit": [
+    "format-staged"
+  ],
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write \"**/*.{ts,tsx}\""
+    ],
+    "*.scss": [
+      "stylelint \"**/*.scss\" --fix"
+    ]
+  }
+}
