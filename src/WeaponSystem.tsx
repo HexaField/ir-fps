@@ -108,7 +108,7 @@ const UserWeaponReactor = (props: { userID: UserID }) => {
       new BoxGeometry(0.05, 0.05, 0.25),
       new BoxGeometry(0.025, 0.125, 0.025).translate(0, -0.125 * 0.5, 0.125)
     ])!.translate(0, 0, 0.125)
-    const weaponModel = new Mesh(geometry, new MeshBasicMaterial({ color: 'grey' }))
+    const weaponModel = new Mesh(geometry, new MeshBasicMaterial({ color: 'grey', depthTest: false }))
     setComponent(entity, MeshComponent, weaponModel)
     addObjectToGroup(entity, weaponModel)
     return entity
@@ -191,7 +191,7 @@ const execute = () => {
   const viewerEntity = getState(EngineState).viewerEntity
 
   const buttons = InputComponent.getMergedButtons(viewerEntity)
-  if (buttons.SecondaryClick?.down) onPrimaryClick()
+  if (buttons.PrimaryClick?.down) onPrimaryClick()
 
   const now = getState(ECSState).simulationTime
 
@@ -271,7 +271,8 @@ const reactor = () => {
     for (const entity of followCameraQuery) {
       getMutableComponent(entity, FollowCameraComponent).merge({
         mode: FollowCameraMode.FirstPerson,
-        pointerLock: true
+        pointerLock: true,
+        smoothLerp: false
       })
     }
   }, [followCameraQuery])
