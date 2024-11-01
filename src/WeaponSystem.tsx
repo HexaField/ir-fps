@@ -14,6 +14,7 @@ import {
   setComponent,
   useQuery
 } from '@ir-engine/ecs'
+import { AvatarRigComponent } from '@ir-engine/engine/src/avatar/components/AvatarAnimationComponent'
 import {
   UserID,
   defineAction,
@@ -26,7 +27,7 @@ import {
   useHookstate,
   useMutableState
 } from '@ir-engine/hyperflux'
-import { WorldNetworkAction, matchesUserID } from '@ir-engine/network'
+import { NetworkObjectComponent, WorldNetworkAction, matchesUserID } from '@ir-engine/network'
 import { TransformComponent } from '@ir-engine/spatial'
 import { EngineState } from '@ir-engine/spatial/src/EngineState'
 import { CameraComponent } from '@ir-engine/spatial/src/camera/components/CameraComponent'
@@ -41,7 +42,7 @@ import { MeshComponent } from '@ir-engine/spatial/src/renderer/components/MeshCo
 import { VisibleComponent } from '@ir-engine/spatial/src/renderer/components/VisibleComponent'
 import { ObjectLayers } from '@ir-engine/spatial/src/renderer/constants/ObjectLayers'
 import { ComputedTransformComponent } from '@ir-engine/spatial/src/transform/components/ComputedTransformComponent'
-import { EntityTreeComponent } from '@ir-engine/spatial/src/transform/components/EntityTree'
+import { EntityTreeComponent, getAncestorWithComponents } from '@ir-engine/spatial/src/transform/components/EntityTree'
 import { ObjectFitFunctions } from '@ir-engine/spatial/src/xrui/functions/ObjectFitFunctions'
 import React, { useEffect } from 'react'
 import {
@@ -54,6 +55,7 @@ import {
   Raycaster,
   Vector3
 } from 'three'
+import { HealthActions } from './HealthSystem'
 
 const WeaponActions = {
   changeWeapon: defineAction({
@@ -93,26 +95,32 @@ const WeaponState = defineState({
 })
 
 const UserWeaponReactor = (props: { userID: UserID }) => {
-  // const weaponState = useHookstate(WeaponState)[props.userID]
+  const weaponState = useHookstate(getMutableState(WeaponState)[props.userID])
 
   const weaponModelEntity = useHookstate(() => {
     const entity = createEntity()
-    setComponent(entity, UUIDComponent, 'Weapon Model' as EntityUUID)
+    setComponent(entity, UUIDComponent, ('Weapon Model ' + props.userID) as EntityUUID)
     setComponent(entity, VisibleComponent)
     /** @todo update based on FOV */
     setComponent(entity, TransformComponent, { position: new Vector3(0.15, -0.2, -0.5) })
     setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).viewerEntity })
-    setComponent(entity, NameComponent, 'Weapon Model')
+    setComponent(entity, NameComponent, 'Weapon Model ' + props.userID)
     // simple two boxes for weapon model
     const geometry = mergeBufferGeometries([
       new BoxGeometry(0.05, 0.05, 0.25),
       new BoxGeometry(0.025, 0.125, 0.025).translate(0, -0.125 * 0.5, 0.125)
     ])!.translate(0, 0, 0.125)
-    const weaponModel = new Mesh(geometry, new MeshBasicMaterial({ color: 'grey', depthTest: false }))
+    const weaponModel = new Mesh(geometry, new MeshBasicMaterial({ color: 'grey' }))
     setComponent(entity, MeshComponent, weaponModel)
     addObjectToGroup(entity, weaponModel)
     return entity
   }).value
+
+  useEffect(() => {
+    setComponent(weaponModelEntity, TransformComponent, {
+      position: new Vector3(weaponState.handedness.value === 'left' ? -0.15 : 0.15, -0.2, -0.5)
+    })
+  }, [weaponState.handedness])
 
   useEffect(() => {
     return () => {
@@ -150,6 +158,13 @@ const onPrimaryClick = () => {
   const [cameraRaycastHit] = hitscanRaycaster.intersectObjects(sceneObjects, true)
   if (cameraRaycastHit) {
     _targetCameraPosition.copy(cameraRaycastHit.point)
+    const hitEntity = cameraRaycastHit.object.entity
+    const avatarEntity = getAncestorWithComponents(hitEntity, [AvatarRigComponent])
+    if (avatarEntity) {
+      dispatchAction(
+        HealthActions.affectHealth({ userID: getComponent(avatarEntity, NetworkObjectComponent).ownerId, amount: -10 })
+      )
+    }
   } else {
     _targetCameraPosition
       .copy(hitscanRaycaster.ray.direction)
@@ -157,7 +172,10 @@ const onPrimaryClick = () => {
       .add(hitscanRaycaster.ray.origin)
   }
 
-  const weaponPosition = new Vector3(0.15, -0.2, -0.5)
+  const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon Model ' + Engine.instance.store.userID) as EntityUUID)
+
+  const weaponPosition = getComponent(weaponEntity, TransformComponent)
+    .position.clone()
     .applyQuaternion(cameraTransform.rotation)
     .add(cameraTransform.position.clone()) // add hand offset
 
@@ -187,11 +205,23 @@ const onPrimaryClick = () => {
   hitscanEntityCounter++
 }
 
+const swapHands = () => {
+  const weaponState = getState(WeaponState)[Engine.instance.store.userID]
+  dispatchAction(
+    WeaponActions.changeWeapon({
+      userID: Engine.instance.store.userID,
+      weapon: weaponState.weapon,
+      handedness: weaponState.handedness === 'left' ? 'right' : 'left'
+    })
+  )
+}
+
 const execute = () => {
   const viewerEntity = getState(EngineState).viewerEntity
 
   const buttons = InputComponent.getMergedButtons(viewerEntity)
   if (buttons.PrimaryClick?.down) onPrimaryClick()
+  if (buttons.KeyZ?.down) swapHands()
 
   const now = getState(ECSState).simulationTime
 
