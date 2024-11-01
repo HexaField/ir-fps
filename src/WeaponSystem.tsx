@@ -9,8 +9,10 @@ import {
   defineQuery,
   defineSystem,
   getComponent,
+  getMutableComponent,
   removeEntity,
-  setComponent
+  setComponent,
+  useQuery
 } from '@ir-engine/ecs'
 import {
   UserID,
@@ -28,6 +30,8 @@ import { WorldNetworkAction, matchesUserID } from '@ir-engine/network'
 import { TransformComponent } from '@ir-engine/spatial'
 import { EngineState } from '@ir-engine/spatial/src/EngineState'
 import { CameraComponent } from '@ir-engine/spatial/src/camera/components/CameraComponent'
+import { FollowCameraComponent } from '@ir-engine/spatial/src/camera/components/FollowCameraComponent'
+import { FollowCameraMode } from '@ir-engine/spatial/src/camera/types/FollowCameraMode'
 import { NameComponent } from '@ir-engine/spatial/src/common/NameComponent'
 import { mergeBufferGeometries } from '@ir-engine/spatial/src/common/classes/BufferGeometryUtils'
 import { InputComponent } from '@ir-engine/spatial/src/input/components/InputComponent'
@@ -96,7 +100,7 @@ const UserWeaponReactor = (props: { userID: UserID }) => {
     setComponent(entity, UUIDComponent, 'Weapon Model' as EntityUUID)
     setComponent(entity, VisibleComponent)
     /** @todo update based on FOV */
-    setComponent(entity, TransformComponent, { position: new Vector3(0.5, -0.3, -1) })
+    setComponent(entity, TransformComponent, { position: new Vector3(0.15, -0.2, -0.5) })
     setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).viewerEntity })
     setComponent(entity, NameComponent, 'Weapon Model')
     // simple two boxes for weapon model
@@ -153,7 +157,7 @@ const onPrimaryClick = () => {
       .add(hitscanRaycaster.ray.origin)
   }
 
-  const weaponPosition = new Vector3(0.5, -0.3, -1)
+  const weaponPosition = new Vector3(0.15, -0.2, -0.5)
     .applyQuaternion(cameraTransform.rotation)
     .add(cameraTransform.position.clone()) // add hand offset
 
@@ -260,6 +264,17 @@ const reactor = () => {
       removeEntity(reticleEntity)
     }
   }, [])
+
+  const followCameraQuery = useQuery([FollowCameraComponent])
+
+  useEffect(() => {
+    for (const entity of followCameraQuery) {
+      getMutableComponent(entity, FollowCameraComponent).merge({
+        mode: FollowCameraMode.FirstPerson,
+        pointerLock: true
+      })
+    }
+  }, [followCameraQuery])
 
   return null
 }
