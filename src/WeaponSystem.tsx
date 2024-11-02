@@ -6,15 +6,16 @@ import {
   SimulationSystemGroup,
   UUIDComponent,
   createEntity,
-  defineQuery,
   defineSystem,
   getComponent,
   getMutableComponent,
+  hasComponent,
   removeEntity,
   setComponent,
   useQuery
 } from '@ir-engine/ecs'
 import { AvatarRigComponent } from '@ir-engine/engine/src/avatar/components/AvatarAnimationComponent'
+import { AvatarComponent } from '@ir-engine/engine/src/avatar/components/AvatarComponent'
 import {
   UserID,
   defineAction,
@@ -27,7 +28,7 @@ import {
   useHookstate,
   useMutableState
 } from '@ir-engine/hyperflux'
-import { NetworkObjectComponent, WorldNetworkAction, matchesUserID } from '@ir-engine/network'
+import { NetworkObjectComponent, NetworkTopics, WorldNetworkAction, matchesUserID } from '@ir-engine/network'
 import { TransformComponent } from '@ir-engine/spatial'
 import { EngineState } from '@ir-engine/spatial/src/EngineState'
 import { CameraComponent } from '@ir-engine/spatial/src/camera/components/CameraComponent'
@@ -36,13 +37,16 @@ import { FollowCameraMode } from '@ir-engine/spatial/src/camera/types/FollowCame
 import { NameComponent } from '@ir-engine/spatial/src/common/NameComponent'
 import { mergeBufferGeometries } from '@ir-engine/spatial/src/common/classes/BufferGeometryUtils'
 import { InputComponent } from '@ir-engine/spatial/src/input/components/InputComponent'
+import { Physics, RaycastArgs } from '@ir-engine/spatial/src/physics/classes/Physics'
+import { CollisionGroups, DefaultCollisionMask } from '@ir-engine/spatial/src/physics/enums/CollisionGroups'
+import { getInteractionGroups } from '@ir-engine/spatial/src/physics/functions/getInteractionGroups'
+import { SceneQueryType } from '@ir-engine/spatial/src/physics/types/PhysicsTypes'
 import { addObjectToGroup } from '@ir-engine/spatial/src/renderer/components/GroupComponent'
 import { LineSegmentComponent } from '@ir-engine/spatial/src/renderer/components/LineSegmentComponent'
 import { MeshComponent } from '@ir-engine/spatial/src/renderer/components/MeshComponent'
 import { VisibleComponent } from '@ir-engine/spatial/src/renderer/components/VisibleComponent'
-import { ObjectLayers } from '@ir-engine/spatial/src/renderer/constants/ObjectLayers'
 import { ComputedTransformComponent } from '@ir-engine/spatial/src/transform/components/ComputedTransformComponent'
-import { EntityTreeComponent, getAncestorWithComponents } from '@ir-engine/spatial/src/transform/components/EntityTree'
+import { EntityTreeComponent } from '@ir-engine/spatial/src/transform/components/EntityTree'
 import { ObjectFitFunctions } from '@ir-engine/spatial/src/xrui/functions/ObjectFitFunctions'
 import React, { useEffect } from 'react'
 import {
@@ -52,7 +56,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   Quaternion,
-  Raycaster,
+  Vector2,
   Vector3
 } from 'three'
 import { HealthActions } from './HealthSystem'
@@ -62,7 +66,9 @@ const WeaponActions = {
     type: 'hexafield.fps-game.WeaponActions.CHANGE_WEAPON',
     userID: matchesUserID,
     weapon: matches.literals('pistol', 'disc', 'grenade'),
-    handedness: matches.literals('left', 'right')
+    handedness: matches.literals('left', 'right'),
+    $cache: true,
+    $topic: NetworkTopics.world
   })
 }
 
@@ -76,9 +82,6 @@ const WeaponState = defineState({
         weapon: action.weapon,
         handedness: action.handedness
       })
-    }),
-    onUserLeave: WorldNetworkAction.destroyEntity.receive((action) => {
-      getMutableState(WeaponState)[action.entityUUID].set(none)
     })
   },
 
@@ -97,13 +100,21 @@ const WeaponState = defineState({
 const UserWeaponReactor = (props: { userID: UserID }) => {
   const weaponState = useHookstate(getMutableState(WeaponState)[props.userID])
 
+  const isSelf = props.userID === Engine.instance.store.userID
+
   const weaponModelEntity = useHookstate(() => {
     const entity = createEntity()
     setComponent(entity, UUIDComponent, ('Weapon Model ' + props.userID) as EntityUUID)
     setComponent(entity, VisibleComponent)
     /** @todo update based on FOV */
-    setComponent(entity, TransformComponent, { position: new Vector3(0.15, -0.2, -0.5) })
-    setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).viewerEntity })
+    if (isSelf) {
+      setComponent(entity, TransformComponent, { position: new Vector3(0.15, -0.2, -0.5) })
+      setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).viewerEntity })
+    } else {
+      const avatarEntity = AvatarComponent.getUserAvatarEntity(props.userID)
+      setComponent(entity, TransformComponent, { position: new Vector3(0.15, -0.2, -0.5) })
+      setComponent(entity, EntityTreeComponent, { parentEntity: avatarEntity })
+    }
     setComponent(entity, NameComponent, 'Weapon Model ' + props.userID)
     // simple two boxes for weapon model
     const geometry = mergeBufferGeometries([
@@ -136,40 +147,48 @@ const hitscanEntites = [] as Array<[Entity, number]>
 const hitscanTrackerLifespan = 3 * 1000 // 3 seconds
 const hitscanRange = 100 // 100 meters
 const hitscanTrackerMaterial = new LineBasicMaterial({ color: 'red' })
-const hitscanRaycaster = new Raycaster()
-hitscanRaycaster.firstHitOnly = true
-hitscanRaycaster.far = hitscanRange
-hitscanRaycaster.layers.set(ObjectLayers.Camera)
-hitscanRaycaster.layers.enable(ObjectLayers.Avatar)
 
 const _targetCameraPosition = new Vector3()
 
-const cameraLayerQuery = defineQuery([VisibleComponent, MeshComponent])
+const raycastComponentData = {
+  type: SceneQueryType.Closest,
+  origin: new Vector3(),
+  direction: new Vector3(),
+  maxDistance: hitscanRange,
+  groups: getInteractionGroups(CollisionGroups.Default, DefaultCollisionMask)
+} as RaycastArgs
 
 // create temporary hitscan entity
 const onPrimaryClick = () => {
   const entity = createEntity()
   const viewerEntity = getState(EngineState).viewerEntity
   const cameraTransform = getComponent(viewerEntity, TransformComponent)
-  hitscanRaycaster.set(cameraTransform.position, new Vector3(0, 0, -1).applyQuaternion(cameraTransform.rotation))
+  const selfAvatarEntity = AvatarComponent.getSelfAvatarEntity()!
 
-  const sceneObjects = cameraLayerQuery().flatMap((e) => getComponent(e, MeshComponent))
+  const physicsWorld = Physics.getWorld(selfAvatarEntity)!
+  raycastComponentData.excludeRigidBody = selfAvatarEntity
 
-  const [cameraRaycastHit] = hitscanRaycaster.intersectObjects(sceneObjects, true)
+  const [cameraRaycastHit] = Physics.castRayFromCamera(
+    physicsWorld,
+    getComponent(viewerEntity, CameraComponent),
+    new Vector2(0, 0),
+    raycastComponentData
+  )
+
   if (cameraRaycastHit) {
-    _targetCameraPosition.copy(cameraRaycastHit.point)
-    const hitEntity = cameraRaycastHit.object.entity
-    const avatarEntity = getAncestorWithComponents(hitEntity, [AvatarRigComponent])
-    if (avatarEntity) {
+    _targetCameraPosition.set(cameraRaycastHit.position.x, cameraRaycastHit.position.y, cameraRaycastHit.position.z)
+    const hitEntity = cameraRaycastHit.entity
+    const isAvatarEntity = hasComponent(hitEntity, AvatarRigComponent)
+    if (isAvatarEntity) {
       dispatchAction(
-        HealthActions.affectHealth({ userID: getComponent(avatarEntity, NetworkObjectComponent).ownerId, amount: -10 })
+        HealthActions.affectHealth({ userID: getComponent(hitEntity, NetworkObjectComponent).ownerId, amount: -10 })
       )
     }
   } else {
     _targetCameraPosition
-      .copy(hitscanRaycaster.ray.direction)
+      .copy(new Vector3(0, 0, -1).applyQuaternion(cameraTransform.rotation))
       .multiplyScalar(hitscanRange)
-      .add(hitscanRaycaster.ray.origin)
+      .add(cameraTransform.position)
   }
 
   const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon Model ' + Engine.instance.store.userID) as EntityUUID)
@@ -289,7 +308,7 @@ const reactor = () => {
         handedness: 'right'
       })
     )
-
+    dispatchAction(HealthActions.affectHealth({ userID: Engine.instance.store.userID, amount: 0 }))
     return () => {
       removeEntity(reticleEntity)
     }
