@@ -11,10 +11,12 @@ import {
   setComponent
 } from '@ir-engine/ecs'
 import { AvatarRigComponent } from '@ir-engine/engine/src/avatar/components/AvatarAnimationComponent'
+import { respawnAvatar } from '@ir-engine/engine/src/avatar/functions/respawnAvatar'
 import {
   UserID,
   defineAction,
   defineState,
+  dispatchAction,
   getMutableState,
   getState,
   matches,
@@ -62,19 +64,28 @@ export const HealthState = defineState({
     const keys = useMutableState(HealthState).keys
     return (
       <>
-        {keys
-          .filter((userID) => userID !== Engine.instance.store.userID)
-          .map((userID: UserID) => (
-            <UserHealthReactor key={userID} userID={userID} />
-          ))}
+        {keys.map((userID: UserID) => (
+          <UserHealthReactor key={userID} userID={userID} />
+        ))}
       </>
     )
   }
 })
 
 const UserHealthReactor = (props: { userID: UserID }) => {
+  const userHealthState = useMutableState(HealthState)[props.userID]
   const userEntity = NetworkObjectComponent.getOwnedNetworkObjectWithComponent(props.userID, AvatarRigComponent)
-  if (!userEntity) return null
+
+  useEffect(() => {
+    if (!userEntity || props.userID !== Engine.instance.store.userID) return
+
+    if (userHealthState.health.value <= 0) {
+      dispatchAction(HealthActions.affectHealth({ userID: Engine.instance.store.userID, amount: 100 }))
+      respawnAvatar(userEntity)
+    }
+  }, [userEntity, userHealthState.health.value])
+
+  if (!userEntity || props.userID === Engine.instance.store.userID) return null
 
   return <UserHealthBarUI userID={props.userID} userEntity={userEntity} />
 }
