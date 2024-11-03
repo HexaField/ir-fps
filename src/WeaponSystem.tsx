@@ -24,11 +24,10 @@ import {
   getMutableState,
   getState,
   matches,
-  none,
   useHookstate,
   useMutableState
 } from '@ir-engine/hyperflux'
-import { NetworkObjectComponent, NetworkTopics, WorldNetworkAction, matchesUserID } from '@ir-engine/network'
+import { NetworkObjectComponent, NetworkTopics, matchesUserID } from '@ir-engine/network'
 import { TransformComponent } from '@ir-engine/spatial'
 import { EngineState } from '@ir-engine/spatial/src/EngineState'
 import { CameraComponent } from '@ir-engine/spatial/src/camera/components/CameraComponent'
@@ -253,7 +252,7 @@ const execute = () => {
   }
 }
 
-const reactor = () => {
+const WeaponReactor = (props: { viewerEntity: Entity }) => {
   const reticleEntity = useHookstate(() => {
     const entity = createEntity()
     setComponent(entity, NameComponent, 'Weapon Reticle')
@@ -261,9 +260,9 @@ const reactor = () => {
     setComponent(entity, VisibleComponent)
     setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).localFloorEntity })
     setComponent(entity, ComputedTransformComponent, {
-      referenceEntities: [getState(EngineState).viewerEntity],
+      referenceEntities: [props.viewerEntity],
       computeFunction: () => {
-        const camera = getComponent(getState(EngineState).viewerEntity, CameraComponent)
+        const camera = getComponent(props.viewerEntity, CameraComponent)
         const distance = camera.near * 1.1 // 10% in front of camera
         ObjectFitFunctions.attachObjectInFrontOfCamera(entity, 0.01, distance)
       }
@@ -333,5 +332,10 @@ const WeaponSystem = defineSystem({
   uuid: 'hexafield.fps-game.WeaponSystem',
   insert: { with: SimulationSystemGroup },
   execute,
-  reactor
+  reactor: () => {
+    const viewerEntity = useMutableState(EngineState).viewerEntity.value
+    if (!viewerEntity) return null
+
+    return <WeaponReactor viewerEntity={viewerEntity} />
+  }
 })

@@ -26,9 +26,13 @@ Infinite Reality Engine. All Rights Reserved.
 import type { ProjectConfigInterface } from '@ir-engine/projects/ProjectConfigInterface'
 
 const config: ProjectConfigInterface = {
-  onEvent: './projectEventHooks.ts',
+  onEvent: './src/projectEventHooks.ts',
   thumbnail: '/static/IR_thumbnail.jpg',
-  worldInjection: () => import('./src/FPSGame')
+  routes: {
+    fps: {
+      component: () => import('./src/GameRoute')
+    }
+  }
 }
 
 export default config
