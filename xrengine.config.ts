@@ -29,7 +29,7 @@ const config: ProjectConfigInterface = {
   onEvent: './src/projectEventHooks.ts',
   thumbnail: '/static/IR_thumbnail.jpg',
   routes: {
-    fps: {
+    '/fps': {
       component: () => import('./src/GameRoute')
     }
   }
