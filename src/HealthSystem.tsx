@@ -1,16 +1,14 @@
 import {
-  AnimationSystemGroup,
   Engine,
   Entity,
   EntityUUID,
   UUIDComponent,
   createEntity,
-  defineSystem,
+  entityExists,
   getComponent,
   removeEntity,
   setComponent
 } from '@ir-engine/ecs'
-import { AvatarRigComponent } from '@ir-engine/engine/src/avatar/components/AvatarAnimationComponent'
 import { respawnAvatar } from '@ir-engine/engine/src/avatar/functions/respawnAvatar'
 import {
   UserID,
@@ -20,19 +18,22 @@ import {
   getMutableState,
   getState,
   matches,
+  none,
   useHookstate,
   useMutableState
 } from '@ir-engine/hyperflux'
-import { NetworkObjectComponent, NetworkTopics, matchesUserID } from '@ir-engine/network'
+import { NetworkTopics, WorldNetworkAction, matchesUserID } from '@ir-engine/network'
 import { TransformComponent } from '@ir-engine/spatial'
 import { EngineState } from '@ir-engine/spatial/src/EngineState'
 import { NameComponent } from '@ir-engine/spatial/src/common/NameComponent'
+import { Vector3_Up, Vector3_Zero } from '@ir-engine/spatial/src/common/constants/MathConstants'
 import { addObjectToGroup } from '@ir-engine/spatial/src/renderer/components/GroupComponent'
 import { MeshComponent } from '@ir-engine/spatial/src/renderer/components/MeshComponent'
 import { VisibleComponent } from '@ir-engine/spatial/src/renderer/components/VisibleComponent'
+import { ComputedTransformComponent } from '@ir-engine/spatial/src/transform/components/ComputedTransformComponent'
 import { EntityTreeComponent } from '@ir-engine/spatial/src/transform/components/EntityTree'
 import React, { useEffect } from 'react'
-import { DoubleSide, Mesh, PlaneGeometry, ShaderMaterial, Uniform, Vector3 } from 'three'
+import { DoubleSide, Matrix4, Mesh, PlaneGeometry, Quaternion, ShaderMaterial, Uniform, Vector3 } from 'three'
 
 export const HealthActions = {
   affectHealth: defineAction({
@@ -57,6 +58,12 @@ export const HealthState = defineState({
         })
       }
       getMutableState(HealthState)[action.userID].health.set((current) => current + action.amount)
+    }),
+    onPlayerLeave: WorldNetworkAction.destroyEntity.receive((action) => {
+      /** @todo figure out a better of handling this */
+      if (getState(HealthState)[action.entityUUID.replace('_avatar', '')]) {
+        getMutableState(HealthState)[action.entityUUID.replace('_avatar', '')].set(none)
+      }
     })
   },
 
@@ -74,7 +81,7 @@ export const HealthState = defineState({
 
 const UserHealthReactor = (props: { userID: UserID }) => {
   const userHealthState = useMutableState(HealthState)[props.userID]
-  const userEntity = NetworkObjectComponent.getOwnedNetworkObjectWithComponent(props.userID, AvatarRigComponent)
+  const userEntity = UUIDComponent.useEntityByUUID((props.userID + '_avatar') as EntityUUID)
 
   useEffect(() => {
     if (!userEntity || props.userID !== Engine.instance.store.userID) return
@@ -99,14 +106,21 @@ const fragmentShader = `varying vec2 vUv;
 uniform float fps_health;
 void main() {
   float health = fps_health * 0.01;
-  if (vUv.x > health) {
-    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+  if (1.0 - vUv.x < health) {
+    gl_FragColor = vec4(vUv.x, 1.0 - vUv.x, 0.0, 1.0);
   } else {
-    gl_FragColor = vec4(1.0 - vUv.x, vUv.x, 0.0, 1.0);
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
   }
 }`
 
 const healthbarEntities = new Set<Entity>()
+
+const _srcPosition = new Vector3()
+const _dstPosition = new Vector3()
+const _direction = new Vector3()
+const _lookMatrix = new Matrix4()
+const _lookRotation = new Quaternion()
+const _quat = new Quaternion()
 
 const UserHealthBarUI = (props: { userID: UserID; userEntity: Entity }) => {
   const userHealthState = useMutableState(HealthState)[props.userID]
@@ -117,7 +131,27 @@ const UserHealthBarUI = (props: { userID: UserID; userEntity: Entity }) => {
     setComponent(entity, UUIDComponent, (props.userID + ' Health Bar') as EntityUUID)
     setComponent(entity, VisibleComponent)
     setComponent(entity, EntityTreeComponent, { parentEntity: props.userEntity })
-    setComponent(entity, TransformComponent, { position: new Vector3(0, 2.5, 0), scale: new Vector3(1, 0.1, 1) })
+    setComponent(entity, TransformComponent, { position: new Vector3(0, 2.5, 0), scale: new Vector3(1, 0.025, 1) })
+    setComponent(entity, ComputedTransformComponent, {
+      referenceEntities: [props.userEntity, getState(EngineState).viewerEntity],
+      computeFunction: () => {
+        if (!entityExists(props.userEntity)) return
+
+        const camera = getState(EngineState).viewerEntity
+        TransformComponent.getWorldPosition(entity, _srcPosition)
+        TransformComponent.getWorldPosition(camera, _dstPosition)
+        _direction.subVectors(_dstPosition, _srcPosition).normalize()
+        _direction.y = 0
+        _lookMatrix.lookAt(Vector3_Zero, _direction, Vector3_Up)
+        _lookRotation.setFromRotationMatrix(_lookMatrix)
+        const transform = getComponent(entity, TransformComponent)
+        const parentEntity = props.userEntity
+        transform.rotation
+          .copy(_lookRotation)
+          .premultiply(TransformComponent.getWorldRotation(parentEntity, _quat).invert())
+      }
+    })
+
     setComponent(
       entity,
       MeshComponent,
@@ -154,18 +188,3 @@ const UserHealthBarUI = (props: { userID: UserID; userEntity: Entity }) => {
 
   return null
 }
-
-const execute = () => {
-  const camera = getState(EngineState).viewerEntity
-  for (const entity of healthbarEntities) {
-    const transform = getComponent(entity, TransformComponent)
-    const cameraTransform = getComponent(camera, TransformComponent)
-    transform.rotation.copy(cameraTransform.rotation)
-  }
-}
-
-export const HealthBarSystem = defineSystem({
-  uuid: 'hexafield.fps-game.HealthBarSystem',
-  insert: { with: AnimationSystemGroup },
-  execute
-})

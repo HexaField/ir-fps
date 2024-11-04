@@ -159,12 +159,13 @@ const raycastComponentData = {
 
 // create temporary hitscan entity
 const onPrimaryClick = () => {
+  const selfAvatarEntity = AvatarComponent.getSelfAvatarEntity()!
+  const physicsWorld = Physics.getWorld(selfAvatarEntity)
+  if (!physicsWorld) return
+
   const entity = createEntity()
   const viewerEntity = getState(EngineState).viewerEntity
   const cameraTransform = getComponent(viewerEntity, TransformComponent)
-  const selfAvatarEntity = AvatarComponent.getSelfAvatarEntity()!
-
-  const physicsWorld = Physics.getWorld(selfAvatarEntity)!
   raycastComponentData.excludeRigidBody = selfAvatarEntity
 
   const [cameraRaycastHit] = Physics.castRayFromCamera(
