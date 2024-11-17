@@ -32,7 +32,7 @@ import { useImmediateEffect, useMutableState } from '@ir-engine/hyperflux'
 
 import '@ir-engine/client-core/src/util/GlobalStyle.css'
 
-import '@ir-engine/client-core/src/World/LocationModule'
+import '@ir-engine/client-core/src/world/LocationModule'
 
 import { useLoadEngineWithScene, useNetwork } from '@ir-engine/client-core/src/components/World/EngineHooks'
 import { useEngineCanvas } from '@ir-engine/client-core/src/hooks/useEngineCanvas'
