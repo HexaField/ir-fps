@@ -3,7 +3,7 @@ import {
   Engine,
   Entity,
   EntityUUID,
-  SimulationSystemGroup,
+  InputSystemGroup,
   UUIDComponent,
   createEntity,
   defineSystem,
@@ -331,7 +331,7 @@ const WeaponReactor = (props: { viewerEntity: Entity }) => {
 
 const WeaponSystem = defineSystem({
   uuid: 'hexafield.fps-game.WeaponSystem',
-  insert: { with: SimulationSystemGroup },
+  insert: { with: InputSystemGroup },
   execute,
   reactor: () => {
     const viewerEntity = useMutableState(EngineState).viewerEntity.value
