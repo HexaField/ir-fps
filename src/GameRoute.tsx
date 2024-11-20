@@ -25,10 +25,10 @@ Infinite Reality Engine. All Rights Reserved.
 
 import '@ir-engine/client/src/engine'
 
-import React, { useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 
 import { useLoadLocation } from '@ir-engine/client-core/src/components/World/LoadLocationScene'
-import { useImmediateEffect, useMutableState } from '@ir-engine/hyperflux'
+import { useMutableState } from '@ir-engine/hyperflux'
 
 import '@ir-engine/client-core/src/util/GlobalStyle.css'
 
@@ -43,10 +43,10 @@ import { useTranslation } from 'react-i18next'
 
 import './FPSGame'
 
-const LocationPage = () => {
+const GameRoute = () => {
   const ref = useRef<HTMLElement>(document.body)
 
-  useImmediateEffect(() => {
+  useEffect(() => {
     initializeSpatialEngine()
     return () => {
       destroySpatialEngine()
@@ -69,4 +69,4 @@ const LocationPage = () => {
   )
 }
 
-export default LocationPage
+export default GameRoute
