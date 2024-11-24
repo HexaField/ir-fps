@@ -27,19 +27,12 @@ import '@ir-engine/client/src/engine'
 
 import React, { useEffect, useRef } from 'react'
 
-import { useLoadLocation } from '@ir-engine/client-core/src/components/World/LoadLocationScene'
-import { useMutableState } from '@ir-engine/hyperflux'
-
-import '@ir-engine/client-core/src/util/GlobalStyle.css'
-
 import '@ir-engine/client-core/src/world/LocationModule'
 
 import { useNetwork } from '@ir-engine/client-core/src/components/World/EngineHooks'
+import { useLoadLocation } from '@ir-engine/client-core/src/components/World/LoadLocationScene'
 import { useEngineCanvas } from '@ir-engine/client-core/src/hooks/useEngineCanvas'
-import { LoadingUISystemState } from '@ir-engine/client-core/src/systems/LoadingUISystem'
 import { destroySpatialEngine, initializeSpatialEngine } from '@ir-engine/spatial/src/initializeEngine'
-import LoadingView from '@ir-engine/ui/src/primitives/tailwind/LoadingView'
-import { useTranslation } from 'react-i18next'
 
 import './FPSGame'
 
@@ -54,18 +47,10 @@ const GameRoute = () => {
   }, [])
 
   useEngineCanvas(ref)
-
-  const { t } = useTranslation()
-  const ready = useMutableState(LoadingUISystemState).ready
-
   useNetwork({ online: true })
   useLoadLocation({ locationName: 'default' })
 
-  return (
-    <>
-      {!ready.value && <LoadingView fullScreen className="block h-12 w-12" title={t('common:loader.loadingEngine')} />}
-    </>
-  )
+  return <></>
 }
 
 export default GameRoute
