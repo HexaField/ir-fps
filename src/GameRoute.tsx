@@ -34,7 +34,7 @@ import '@ir-engine/client-core/src/util/GlobalStyle.css'
 
 import '@ir-engine/client-core/src/world/LocationModule'
 
-import { useLoadEngineWithScene, useNetwork } from '@ir-engine/client-core/src/components/World/EngineHooks'
+import { useNetwork } from '@ir-engine/client-core/src/components/World/EngineHooks'
 import { useEngineCanvas } from '@ir-engine/client-core/src/hooks/useEngineCanvas'
 import { LoadingUISystemState } from '@ir-engine/client-core/src/systems/LoadingUISystem'
 import { destroySpatialEngine, initializeSpatialEngine } from '@ir-engine/spatial/src/initializeEngine'
@@ -60,7 +60,6 @@ const GameRoute = () => {
 
   useNetwork({ online: true })
   useLoadLocation({ locationName: 'default' })
-  useLoadEngineWithScene()
 
   return (
     <>
