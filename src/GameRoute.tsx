@@ -48,7 +48,7 @@ const GameRoute = () => {
 
   useEngineCanvas(ref)
   useNetwork({ online: true })
-  useLoadLocation({ locationName: 'default' })
+  useLoadLocation({ locationName: 'fps_map' })
 
   return <></>
 }

@@ -1,0 +1,35 @@
+{
+  "public/scenes/New-Scene.envmap.ktx2": {
+    "type": "file",
+    "tags": [
+      "Image"
+    ],
+    "dependencies": [],
+    "name": "New-Scene.envmap.ktx2"
+  },
+  "public/scenes/New-Scene.gltf": {
+    "type": "scene",
+    "tags": [
+      "Model"
+    ],
+    "dependencies": [],
+    "name": "New-Scene.gltf",
+    "thumbnailKey": "projects/ir-engine/default-project/public/scenes/default.thumbnail.jpg"
+  },
+  "public/scenes/New-Scene.loadingscreen.ktx2": {
+    "type": "file",
+    "tags": [
+      "Image"
+    ],
+    "dependencies": [],
+    "name": "New-Scene.loadingscreen.ktx2"
+  },
+  "public/scenes/New-Scene.thumbnail.jpg": {
+    "type": "file",
+    "tags": [
+      "Image"
+    ],
+    "dependencies": [],
+    "name": "New-Scene.thumbnail.jpg"
+  }
+}
