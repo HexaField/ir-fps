@@ -25,32 +25,52 @@ Infinite Reality Engine. All Rights Reserved.
 
 import '@ir-engine/client/src/engine'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useRef } from 'react'
 
 import '@ir-engine/client-core/src/world/LocationModule'
+import './FPSGame'
 
 import { useNetwork } from '@ir-engine/client-core/src/components/World/EngineHooks'
 import { useLoadLocation } from '@ir-engine/client-core/src/components/World/LoadLocationScene'
 import { useEngineCanvas } from '@ir-engine/client-core/src/hooks/useEngineCanvas'
-import { destroySpatialEngine, initializeSpatialEngine } from '@ir-engine/spatial/src/initializeEngine'
+import { useSpatialEngine } from '@ir-engine/spatial/src/initializeEngine'
 
-import './FPSGame'
+import { useFind } from '@ir-engine/common'
+import { locationPath } from '@ir-engine/common/src/schema.type.module'
+import { useHookstate } from '@ir-engine/hyperflux'
+import Button from '@ir-engine/ui/src/primitives/tailwind/Button'
 
-const GameRoute = () => {
+const Selectedlocation = (props: { selectedLocation: string }) => {
   const ref = useRef<HTMLElement>(document.body)
 
-  useEffect(() => {
-    initializeSpatialEngine()
-    return () => {
-      destroySpatialEngine()
-    }
-  }, [])
-
+  useSpatialEngine()
   useEngineCanvas(ref)
   useNetwork({ online: true })
-  useLoadLocation({ locationName: 'default' })
+  useLoadLocation({ locationName: props.selectedLocation })
 
   return <></>
+}
+
+// simple lobby, just list all locations
+const GameRoute = () => {
+  const selectedLocation = useHookstate('')
+
+  const locations = useFind(locationPath)
+
+  if (selectedLocation.value) return <Selectedlocation selectedLocation={selectedLocation.value} />
+
+  return (
+    <div className="pointer-events-auto flex flex-col space-y-4">
+      <div className="text-center text-2xl font-bold">Select a location</div>
+      <div className="mx-auto flex w-fit flex-col space-y-2">
+        {locations.data.map((location) => (
+          <Button key={location.id} onClick={() => selectedLocation.set(location.slugifiedName)}>
+            {location.slugifiedName}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default GameRoute
