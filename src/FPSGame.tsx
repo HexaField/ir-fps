@@ -1,2 +1,2 @@
 import './HealthSystem'
-import './WeaponSystem'
+import './weapons/WeaponSystem'

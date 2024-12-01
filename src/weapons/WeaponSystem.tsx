@@ -49,16 +49,17 @@ import { EntityTreeComponent } from '@ir-engine/spatial/src/transform/components
 import { ObjectFitFunctions } from '@ir-engine/spatial/src/xrui/functions/ObjectFitFunctions'
 import React, { useEffect } from 'react'
 import {
-  BoxGeometry,
   BufferGeometry,
   LineBasicMaterial,
+  MathUtils,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   Quaternion,
-  Vector2,
   Vector3
 } from 'three'
-import { HealthActions } from './HealthSystem'
+import { HealthActions } from '../HealthSystem'
+import { HitscanWeaponComponent } from './components/HitScanWeaponComponent'
 
 const WeaponActions = {
   changeWeapon: defineAction({
@@ -103,7 +104,7 @@ const UserWeaponReactor = (props: { userID: UserID }) => {
 
   const weaponModelEntity = useHookstate(() => {
     const entity = createEntity()
-    setComponent(entity, UUIDComponent, ('Weapon Model ' + props.userID) as EntityUUID)
+    setComponent(entity, UUIDComponent, ('Weapon ' + props.userID) as EntityUUID)
     setComponent(entity, VisibleComponent)
     /** @todo update based on FOV */
     if (isSelf) {
@@ -114,15 +115,9 @@ const UserWeaponReactor = (props: { userID: UserID }) => {
       setComponent(entity, TransformComponent, { position: new Vector3(0.15, -0.2, -0.5) })
       setComponent(entity, EntityTreeComponent, { parentEntity: avatarEntity })
     }
-    setComponent(entity, NameComponent, 'Weapon Model ' + props.userID)
+    setComponent(entity, NameComponent, 'Weapon ' + props.userID)
     // simple two boxes for weapon model
-    const geometry = mergeBufferGeometries([
-      new BoxGeometry(0.05, 0.05, 0.25),
-      new BoxGeometry(0.025, 0.125, 0.025).translate(0, -0.125 * 0.5, 0.125)
-    ])!.translate(0, 0, 0.125)
-    const weaponModel = new Mesh(geometry, new MeshBasicMaterial({ color: 'grey' }))
-    setComponent(entity, MeshComponent, weaponModel)
-    addObjectToGroup(entity, weaponModel)
+    setComponent(entity, HitscanWeaponComponent)
     return entity
   }).value
 
@@ -146,7 +141,7 @@ const hitscanEntites = [] as Array<[Entity, number]>
 const hitscanTrackerLifespan = 3 * 1000 // 3 seconds
 const hitscanRange = 100 // 100 meters
 const hitscanTrackerMaterial = new LineBasicMaterial({ color: 'red' })
-
+let lastFiredTime = 0
 const _targetCameraPosition = new Vector3()
 
 const raycastComponentData = {
@@ -158,22 +153,57 @@ const raycastComponentData = {
 } as RaycastArgs
 
 // create temporary hitscan entity
+// interact with current weapon
 const onPrimaryClick = () => {
   const selfAvatarEntity = AvatarComponent.getSelfAvatarEntity()!
   const physicsWorld = Physics.getWorld(selfAvatarEntity)
   if (!physicsWorld) return
 
+  const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon ' + Engine.instance.store.userID) as EntityUUID)
+  const weaponParams = getComponent(weaponEntity, HitscanWeaponComponent)
+
+  if (weaponParams.currentAmmo <= 0) {
+    console.log('Out of ammo! Reload required.')
+    return
+  }
+
+  const now = getState(ECSState).simulationTime
+  if (lastFiredTime + weaponParams.fireRate > now) {
+    console.log('Weapon cooling down.')
+    return
+  }
+
   const entity = createEntity()
   const viewerEntity = getState(EngineState).viewerEntity
   const cameraTransform = getComponent(viewerEntity, TransformComponent)
   raycastComponentData.excludeRigidBody = selfAvatarEntity
+  const worldEntity = UUIDComponent.getEntityByUUID(physicsWorld.id)
+  const worldTransform = getComponent(worldEntity, TransformComponent)
+  const matrix = new Matrix4()
+    .copy(worldTransform.matrixWorld)
+    .invert()
+    .multiply(getComponent(viewerEntity, CameraComponent).matrixWorld)
+  raycastComponentData.origin.setFromMatrixPosition(matrix)
+  let direction = new Vector3(0, 0, 0.5)
+    .unproject(getComponent(viewerEntity, CameraComponent))
+    .sub(raycastComponentData.origin)
+    .normalize()
+  const spreadAngle = weaponParams.spread
+  const spreadRadians = MathUtils.degToRad(spreadAngle)
+  const spreadOffset = new Vector3((Math.random() - 0.5) * spreadRadians, (Math.random() - 0.5) * spreadRadians, 0)
 
-  const [cameraRaycastHit] = Physics.castRayFromCamera(
-    physicsWorld,
-    getComponent(viewerEntity, CameraComponent),
-    new Vector2(0, 0),
-    raycastComponentData
-  )
+  direction.add(spreadOffset).normalize()
+  raycastComponentData.direction.copy(direction)
+  raycastComponentData.excludeRigidBody = selfAvatarEntity
+  raycastComponentData.maxDistance = weaponParams.range
+
+  let cameraRaycastHit: any = null
+
+  if (weaponParams.scanSize > 0) {
+    console.log('Conical scan not implemented yet.')
+  } else {
+    ;[cameraRaycastHit] = Physics.castRay(physicsWorld, raycastComponentData)
+  }
 
   if (cameraRaycastHit) {
     _targetCameraPosition.set(cameraRaycastHit.position.x, cameraRaycastHit.position.y, cameraRaycastHit.position.z)
@@ -181,30 +211,27 @@ const onPrimaryClick = () => {
     const isAvatarEntity = hasComponent(hitEntity, AvatarRigComponent)
     if (isAvatarEntity) {
       dispatchAction(
-        HealthActions.affectHealth({ userID: getComponent(hitEntity, NetworkObjectComponent).ownerId, amount: -10 })
+        HealthActions.affectHealth({
+          userID: getComponent(hitEntity, NetworkObjectComponent).ownerId,
+          amount: -weaponParams.damage
+        })
       )
     }
   } else {
-    _targetCameraPosition
-      .copy(new Vector3(0, 0, -1).applyQuaternion(cameraTransform.rotation))
-      .multiplyScalar(hitscanRange)
-      .add(cameraTransform.position)
+    _targetCameraPosition.copy(direction).multiplyScalar(hitscanRange).add(raycastComponentData.origin)
   }
-
-  const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon Model ' + Engine.instance.store.userID) as EntityUUID)
 
   const weaponPosition = getComponent(weaponEntity, TransformComponent)
     .position.clone()
     .applyQuaternion(cameraTransform.rotation)
-    .add(cameraTransform.position.clone()) // add hand offset
+    .add(cameraTransform.position.clone()) // Add hand offset
 
-  const direction = _targetCameraPosition.clone().sub(weaponPosition).normalize()
-  const directionQuaternion = new Quaternion().setFromUnitVectors(new Vector3(0, 0, -1), direction)
+  const finalDirection = _targetCameraPosition.clone().sub(weaponPosition).normalize()
+  const directionQuaternion = new Quaternion().setFromUnitVectors(new Vector3(0, 0, -1), finalDirection)
 
   setComponent(entity, UUIDComponent, ('Hitscan Tracker ' + hitscanEntityCounter) as EntityUUID)
   setComponent(entity, VisibleComponent)
   setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).originEntity })
-
   setComponent(entity, TransformComponent, {
     position: weaponPosition,
     rotation: directionQuaternion
@@ -214,12 +241,19 @@ const onPrimaryClick = () => {
     name: 'Hitscan Tracker ' + hitscanEntityCounter,
     geometry: new BufferGeometry().setFromPoints([
       new Vector3(),
-      new Vector3(0, 0, -(cameraRaycastHit ? cameraRaycastHit.distance : hitscanRange))
+      new Vector3(0, 0, -(cameraRaycastHit ? cameraRaycastHit.distance : weaponParams.range))
     ]),
     material: hitscanTrackerMaterial
   })
 
-  hitscanEntites.push([entity, getState(ECSState).simulationTime])
+  hitscanEntites.push([entity, now])
+
+  // Update weapon state
+  getMutableComponent(weaponEntity, HitscanWeaponComponent).currentAmmo.set((value) => value - 1)
+  lastFiredTime = now
+
+  // Handle reload if needed
+  if (weaponParams.currentAmmo <= 0) reload()
 
   hitscanEntityCounter++
 }
@@ -235,12 +269,24 @@ const swapHands = () => {
   )
 }
 
+const reload = () => {
+  const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon ' + Engine.instance.store.userID) as EntityUUID)
+  const weaponParams = getMutableComponent(weaponEntity, HitscanWeaponComponent)
+
+  console.log('Reloading...')
+  setTimeout(() => {
+    weaponParams.currentAmmo.set(weaponParams.clipSize.value)
+    console.log('Reload complete.')
+  }, weaponParams.reloadTime.value)
+}
+
 const execute = () => {
   const viewerEntity = getState(EngineState).viewerEntity
 
   const buttons = InputComponent.getMergedButtons(viewerEntity)
   if (buttons.PrimaryClick?.down) onPrimaryClick()
   if (buttons.KeyZ?.down) swapHands()
+  if (buttons.KeyR?.down) reload()
 
   const now = getState(ECSState).simulationTime
 
