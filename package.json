@@ -1,5 +1,5 @@
 {
-  "name": "@hexafield/fps-game",
+  "name": "@ir-engine/ir-fps",
   "version": "0.0.0",
   "scripts": {
     "test": "cross-env TEST=true vitest run",

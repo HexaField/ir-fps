@@ -27,46 +27,50 @@ import '@ir-engine/client/src/engine'
 
 import React, { useRef } from 'react'
 
-import { useLoadLocation } from '@ir-engine/client-core/src/components/World/LoadLocationScene'
-import { useImmediateEffect, useMutableState } from '@ir-engine/hyperflux'
-
-import '@ir-engine/client-core/src/util/GlobalStyle.css'
-
 import '@ir-engine/client-core/src/world/LocationModule'
-
-import { useLoadEngineWithScene, useNetwork } from '@ir-engine/client-core/src/components/World/EngineHooks'
-import { useEngineCanvas } from '@ir-engine/client-core/src/hooks/useEngineCanvas'
-import { LoadingUISystemState } from '@ir-engine/client-core/src/systems/LoadingUISystem'
-import { destroySpatialEngine, initializeSpatialEngine } from '@ir-engine/spatial/src/initializeEngine'
-import LoadingView from '@ir-engine/ui/src/primitives/tailwind/LoadingView'
-import { useTranslation } from 'react-i18next'
-
 import './FPSGame'
 
-const LocationPage = () => {
+import { useNetwork } from '@ir-engine/client-core/src/components/World/EngineHooks'
+import { useLoadLocation } from '@ir-engine/client-core/src/components/World/LoadLocationScene'
+import { useEngineCanvas } from '@ir-engine/client-core/src/hooks/useEngineCanvas'
+import { useSpatialEngine } from '@ir-engine/spatial/src/initializeEngine'
+
+import { useFind } from '@ir-engine/common'
+import { locationPath } from '@ir-engine/common/src/schema.type.module'
+import { useHookstate } from '@ir-engine/hyperflux'
+import Button from '@ir-engine/ui/src/primitives/tailwind/Button'
+
+const Selectedlocation = (props: { selectedLocation: string }) => {
   const ref = useRef<HTMLElement>(document.body)
 
-  useImmediateEffect(() => {
-    initializeSpatialEngine()
-    return () => {
-      destroySpatialEngine()
-    }
-  }, [])
-
+  useSpatialEngine()
   useEngineCanvas(ref)
-
-  const { t } = useTranslation()
-  const ready = useMutableState(LoadingUISystemState).ready
-
   useNetwork({ online: true })
-  useLoadLocation({ locationName: 'default' })
-  useLoadEngineWithScene()
+  useLoadLocation({ locationName: props.selectedLocation })
+
+  return <></>
+}
+
+// simple lobby, just list all locations
+const GameRoute = () => {
+  const selectedLocation = useHookstate('')
+
+  const locations = useFind(locationPath)
+
+  if (selectedLocation.value) return <Selectedlocation selectedLocation={selectedLocation.value} />
 
   return (
-    <>
-      {!ready.value && <LoadingView fullScreen className="block h-12 w-12" title={t('common:loader.loadingEngine')} />}
-    </>
+    <div className="pointer-events-auto flex flex-col space-y-4">
+      <div className="text-center text-2xl font-bold">Select a location</div>
+      <div className="mx-auto flex w-fit flex-col space-y-2">
+        {locations.data.map((location) => (
+          <Button key={location.id} onClick={() => selectedLocation.set(location.slugifiedName)}>
+            {location.slugifiedName}
+          </Button>
+        ))}
+      </div>
+    </div>
   )
 }
 
-export default LocationPage
+export default GameRoute

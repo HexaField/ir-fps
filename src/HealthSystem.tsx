@@ -22,7 +22,7 @@ import {
   useHookstate,
   useMutableState
 } from '@ir-engine/hyperflux'
-import { NetworkTopics, WorldNetworkAction, matchesUserID } from '@ir-engine/network'
+import { NetworkTopics, matchesUserID } from '@ir-engine/network'
 import { TransformComponent } from '@ir-engine/spatial'
 import { EngineState } from '@ir-engine/spatial/src/EngineState'
 import { NameComponent } from '@ir-engine/spatial/src/common/NameComponent'
@@ -34,6 +34,7 @@ import { ComputedTransformComponent } from '@ir-engine/spatial/src/transform/com
 import { EntityTreeComponent } from '@ir-engine/spatial/src/transform/components/EntityTree'
 import React, { useEffect } from 'react'
 import { DoubleSide, Matrix4, Mesh, PlaneGeometry, Quaternion, ShaderMaterial, Uniform, Vector3 } from 'three'
+import { PlayerActions } from './PlayerState'
 
 export const HealthActions = {
   affectHealth: defineAction({
@@ -59,10 +60,9 @@ export const HealthState = defineState({
       }
       getMutableState(HealthState)[action.userID].health.set((current) => current + action.amount)
     }),
-    onPlayerLeave: WorldNetworkAction.destroyEntity.receive((action) => {
-      /** @todo figure out a better of handling this */
-      if (getState(HealthState)[action.entityUUID.replace('_avatar', '')]) {
-        getMutableState(HealthState)[action.entityUUID.replace('_avatar', '')].set(none)
+    onPlayerLeave: PlayerActions.playerLeft.receive((action) => {
+      if (getState(HealthState)[action.userID]) {
+        getMutableState(HealthState)[action.userID].set(none)
       }
     })
   },
