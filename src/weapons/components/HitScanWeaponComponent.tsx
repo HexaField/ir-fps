@@ -12,10 +12,9 @@ export const HitscanWeaponComponent = defineComponent({
 
   schema: S.Object({
     weaponModel: S.String(''),
-    fireRate: S.Number(200), //ms
     lifespan: S.Number(1000), //ms unused for now
     reloadTime: S.Number(5000), // ms
-    clipSize: S.Number(10),
+    clipSize: S.Number(20),
     currentAmmo: S.Number(10),
     damage: S.Number(10),
     range: S.Number(100), // in meters

@@ -60,6 +60,7 @@ import {
 } from 'three'
 import { HealthActions } from '../HealthSystem'
 import { HitscanWeaponComponent } from './components/HitScanWeaponComponent'
+import { SingleFireTriggerComponent } from './components/trigger/SingleFireTriggerComponent'
 
 const WeaponActions = {
   changeWeapon: defineAction({
@@ -118,6 +119,10 @@ const UserWeaponReactor = (props: { userID: UserID }) => {
     setComponent(entity, NameComponent, 'Weapon ' + props.userID)
     // simple two boxes for weapon model
     setComponent(entity, HitscanWeaponComponent)
+    setComponent(entity, SingleFireTriggerComponent)
+    //setComponent(entity, BurstFireTriggerComponent)
+    //setComponent(entity, HoldFireTriggerComponent)
+
     return entity
   }).value
 
@@ -141,7 +146,6 @@ const hitscanEntites = [] as Array<[Entity, number]>
 const hitscanTrackerLifespan = 3 * 1000 // 3 seconds
 const hitscanRange = 100 // 100 meters
 const hitscanTrackerMaterial = new LineBasicMaterial({ color: 'red' })
-let lastFiredTime = 0
 const _targetCameraPosition = new Vector3()
 
 const raycastComponentData = {
@@ -154,11 +158,11 @@ const raycastComponentData = {
 
 // create temporary hitscan entity
 // interact with current weapon
-const onPrimaryClick = () => {
+
+export const shoot = () => {
   const selfAvatarEntity = AvatarComponent.getSelfAvatarEntity()!
   const physicsWorld = Physics.getWorld(selfAvatarEntity)
   if (!physicsWorld) return
-
   const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon ' + Engine.instance.store.userID) as EntityUUID)
   const weaponParams = getComponent(weaponEntity, HitscanWeaponComponent)
 
@@ -168,11 +172,6 @@ const onPrimaryClick = () => {
   }
 
   const now = getState(ECSState).simulationTime
-  if (lastFiredTime + weaponParams.fireRate > now) {
-    console.log('Weapon cooling down.')
-    return
-  }
-
   const entity = createEntity()
   const viewerEntity = getState(EngineState).viewerEntity
   const cameraTransform = getComponent(viewerEntity, TransformComponent)
@@ -250,7 +249,6 @@ const onPrimaryClick = () => {
 
   // Update weapon state
   getMutableComponent(weaponEntity, HitscanWeaponComponent).currentAmmo.set((value) => value - 1)
-  lastFiredTime = now
 
   // Handle reload if needed
   if (weaponParams.currentAmmo <= 0) reload()
@@ -284,7 +282,6 @@ const execute = () => {
   const viewerEntity = getState(EngineState).viewerEntity
 
   const buttons = InputComponent.getMergedButtons(viewerEntity)
-  if (buttons.PrimaryClick?.down) onPrimaryClick()
   if (buttons.KeyZ?.down) swapHands()
   if (buttons.KeyR?.down) reload()
 
