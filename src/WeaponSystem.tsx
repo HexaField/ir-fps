@@ -40,9 +40,9 @@ import { Physics, RaycastArgs } from '@ir-engine/spatial/src/physics/classes/Phy
 import { CollisionGroups, DefaultCollisionMask } from '@ir-engine/spatial/src/physics/enums/CollisionGroups'
 import { getInteractionGroups } from '@ir-engine/spatial/src/physics/functions/getInteractionGroups'
 import { SceneQueryType } from '@ir-engine/spatial/src/physics/types/PhysicsTypes'
-import { addObjectToGroup } from '@ir-engine/spatial/src/renderer/components/GroupComponent'
 import { LineSegmentComponent } from '@ir-engine/spatial/src/renderer/components/LineSegmentComponent'
 import { MeshComponent } from '@ir-engine/spatial/src/renderer/components/MeshComponent'
+import { addObjectToGroup } from '@ir-engine/spatial/src/renderer/components/ObjectComponent'
 import { VisibleComponent } from '@ir-engine/spatial/src/renderer/components/VisibleComponent'
 import { ComputedTransformComponent } from '@ir-engine/spatial/src/transform/components/ComputedTransformComponent'
 import { EntityTreeComponent } from '@ir-engine/spatial/src/transform/components/EntityTree'
@@ -319,9 +319,9 @@ const WeaponReactor = (props: { viewerEntity: Entity }) => {
   useEffect(() => {
     for (const entity of followCameraQuery) {
       getMutableComponent(entity, FollowCameraComponent).merge({
-        mode: FollowCameraMode.FirstPerson,
-        pointerLock: true,
-        smoothLerp: false
+        mode: FollowCameraMode.FirstPerson
+        // pointerLock: true,
+        // smoothLerp: false
       })
     }
   }, [followCameraQuery])
