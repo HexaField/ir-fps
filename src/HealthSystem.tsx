@@ -84,15 +84,15 @@ const UserHealthReactor = (props: { userID: UserID }) => {
   const userEntity = UUIDComponent.useEntityByUUID((props.userID + '_avatar') as EntityUUID)
 
   useEffect(() => {
-    if (!userEntity || props.userID !== Engine.instance.store.userID) return
+    if (!userEntity || props.userID !== Engine.instance.userID) return
 
     if (userHealthState.health.value <= 0) {
-      dispatchAction(HealthActions.affectHealth({ userID: Engine.instance.store.userID, amount: 100 }))
+      dispatchAction(HealthActions.affectHealth({ userID: Engine.instance.userID, amount: 100 }))
       respawnAvatar(userEntity)
     }
   }, [userEntity, userHealthState.health.value])
 
-  if (!userEntity || props.userID === Engine.instance.store.userID) return null
+  if (!userEntity || props.userID === Engine.instance.userID) return null
 
   return <UserHealthBarUI userID={props.userID} userEntity={userEntity} />
 }

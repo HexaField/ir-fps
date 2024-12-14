@@ -101,7 +101,7 @@ const WeaponState = defineState({
 const UserWeaponReactor = (props: { userID: UserID }) => {
   const weaponState = useHookstate(getMutableState(WeaponState)[props.userID])
 
-  const isSelf = props.userID === Engine.instance.store.userID
+  const isSelf = props.userID === Engine.instance.userID
 
   const weaponModelEntity = useHookstate(() => {
     const entity = createEntity()
@@ -163,7 +163,7 @@ export const shoot = () => {
   const selfAvatarEntity = AvatarComponent.getSelfAvatarEntity()!
   const physicsWorld = Physics.getWorld(selfAvatarEntity)
   if (!physicsWorld) return
-  const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon ' + Engine.instance.store.userID) as EntityUUID)
+  const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon ' + Engine.instance.userID) as EntityUUID)
   const weaponParams = getComponent(weaponEntity, HitscanWeaponComponent)
 
   if (weaponParams.currentAmmo <= 0) {
@@ -257,10 +257,10 @@ export const shoot = () => {
 }
 
 const swapHands = () => {
-  const weaponState = getState(WeaponState)[Engine.instance.store.userID]
+  const weaponState = getState(WeaponState)[Engine.instance.userID]
   dispatchAction(
     WeaponActions.changeWeapon({
-      userID: Engine.instance.store.userID,
+      userID: Engine.instance.userID,
       weapon: weaponState.weapon,
       handedness: weaponState.handedness === 'left' ? 'right' : 'left'
     })
@@ -268,7 +268,7 @@ const swapHands = () => {
 }
 
 const reload = () => {
-  const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon ' + Engine.instance.store.userID) as EntityUUID)
+  const weaponEntity = UUIDComponent.getEntityByUUID(('Weapon ' + Engine.instance.userID) as EntityUUID)
   const weaponParams = getMutableComponent(weaponEntity, HitscanWeaponComponent)
 
   console.log('Reloading...')
@@ -346,12 +346,12 @@ const WeaponReactor = (props: { viewerEntity: Entity }) => {
   useEffect(() => {
     dispatchAction(
       WeaponActions.changeWeapon({
-        userID: Engine.instance.store.userID,
+        userID: Engine.instance.userID,
         weapon: 'pistol',
         handedness: 'right'
       })
     )
-    dispatchAction(HealthActions.affectHealth({ userID: Engine.instance.store.userID, amount: 0 }))
+    dispatchAction(HealthActions.affectHealth({ userID: Engine.instance.userID, amount: 0 }))
     return () => {
       removeEntity(reticleEntity)
     }
