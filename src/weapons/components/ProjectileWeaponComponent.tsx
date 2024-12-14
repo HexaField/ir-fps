@@ -1,11 +1,18 @@
-import { defineComponent, setComponent, useComponent, useEntityContext } from '@ir-engine/ecs'
+import {
+  defineComponent,
+  getComponent,
+  getMutableComponent,
+  setComponent,
+  useComponent,
+  useEntityContext
+} from '@ir-engine/ecs'
 import { S } from '@ir-engine/ecs/src/schemas/JSONSchemas'
 import { mergeBufferGeometries } from '@ir-engine/spatial/src/common/classes/BufferGeometryUtils'
+import { Physics } from '@ir-engine/spatial/src/physics/classes/Physics'
 import { addObjectToGroup, removeGroupComponent } from '@ir-engine/spatial/src/renderer/components/GroupComponent'
 import { MeshComponent } from '@ir-engine/spatial/src/renderer/components/MeshComponent'
 import { useEffect } from 'react'
 import { BoxGeometry, Mesh, MeshBasicMaterial } from 'three'
-import { HitscanWeaponComponent } from './HitScanWeaponComponent'
 
 export const ProjectileWeaponComponent = defineComponent({
   name: 'ProjectileWeaponComponent',
@@ -34,10 +41,29 @@ export const ProjectileWeaponComponent = defineComponent({
       bulletDecayLifetime: S.Number(2)
     })
   }),
+  shoot: (playerEntity, weaponEntity) => {
+    const physicsWorld = Physics.getWorld(playerEntity)
+    const currentWeaponEntity = useEntityContext()
+    if (weaponEntity !== currentWeaponEntity) return
+    if (!physicsWorld) return
+    const weaponParams = getComponent(weaponEntity, ProjectileWeaponComponent)
+    if (weaponParams.currentAmmo <= 0) {
+      console.log('Out of ammo! Reload required.')
+      return
+    }
+    // create a bullet entity
+    // projectile shoot the bullet entity
 
+    getMutableComponent(weaponEntity, ProjectileWeaponComponent).currentAmmo.set((value) => value - 1)
+
+    if (weaponParams.currentAmmo <= 0) {
+      ProjectileWeaponComponent.reload(weaponEntity)
+    }
+  },
+  reload: (weaponEntity) => {},
   reactor: () => {
     const entity = useEntityContext()
-    const weapon = useComponent(entity, HitscanWeaponComponent)
+    const weapon = useComponent(entity, ProjectileWeaponComponent)
     useEffect(() => {
       if (weapon.weaponModel.value === '') {
         console.warn('Weapon Model is not defined , using Default')
