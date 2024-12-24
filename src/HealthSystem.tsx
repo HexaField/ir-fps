@@ -1,6 +1,7 @@
 import {
   Engine,
   Entity,
+  EntityTreeComponent,
   EntityUUID,
   UUIDComponent,
   createEntity,
@@ -23,15 +24,13 @@ import {
   useMutableState
 } from '@ir-engine/hyperflux'
 import { NetworkTopics, matchesUserID } from '@ir-engine/network'
-import { TransformComponent } from '@ir-engine/spatial'
-import { EngineState } from '@ir-engine/spatial/src/EngineState'
+import { ReferenceSpaceState, TransformComponent } from '@ir-engine/spatial'
 import { NameComponent } from '@ir-engine/spatial/src/common/NameComponent'
 import { Vector3_Up, Vector3_Zero } from '@ir-engine/spatial/src/common/constants/MathConstants'
 import { addObjectToGroup } from '@ir-engine/spatial/src/renderer/components/GroupComponent'
 import { MeshComponent } from '@ir-engine/spatial/src/renderer/components/MeshComponent'
 import { VisibleComponent } from '@ir-engine/spatial/src/renderer/components/VisibleComponent'
 import { ComputedTransformComponent } from '@ir-engine/spatial/src/transform/components/ComputedTransformComponent'
-import { EntityTreeComponent } from '@ir-engine/spatial/src/transform/components/EntityTree'
 import React, { useEffect } from 'react'
 import { DoubleSide, Matrix4, Mesh, PlaneGeometry, Quaternion, ShaderMaterial, Uniform, Vector3 } from 'three'
 import { PlayerActions } from './PlayerState'
@@ -133,11 +132,11 @@ const UserHealthBarUI = (props: { userID: UserID; userEntity: Entity }) => {
     setComponent(entity, EntityTreeComponent, { parentEntity: props.userEntity })
     setComponent(entity, TransformComponent, { position: new Vector3(0, 2.5, 0), scale: new Vector3(1, 0.025, 1) })
     setComponent(entity, ComputedTransformComponent, {
-      referenceEntities: [props.userEntity, getState(EngineState).viewerEntity],
+      referenceEntities: [props.userEntity, getState(ReferenceSpaceState).viewerEntity],
       computeFunction: () => {
         if (!entityExists(props.userEntity)) return
 
-        const camera = getState(EngineState).viewerEntity
+        const camera = getState(ReferenceSpaceState).viewerEntity
         TransformComponent.getWorldPosition(entity, _srcPosition)
         TransformComponent.getWorldPosition(camera, _dstPosition)
         _direction.subVectors(_dstPosition, _srcPosition).normalize()

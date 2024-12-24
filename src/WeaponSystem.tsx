@@ -2,6 +2,7 @@ import {
   ECSState,
   Engine,
   Entity,
+  EntityTreeComponent,
   EntityUUID,
   InputSystemGroup,
   UUIDComponent,
@@ -28,8 +29,7 @@ import {
   useMutableState
 } from '@ir-engine/hyperflux'
 import { NetworkObjectComponent, NetworkTopics, matchesUserID } from '@ir-engine/network'
-import { TransformComponent } from '@ir-engine/spatial'
-import { EngineState } from '@ir-engine/spatial/src/EngineState'
+import { ReferenceSpaceState, TransformComponent } from '@ir-engine/spatial'
 import { CameraComponent } from '@ir-engine/spatial/src/camera/components/CameraComponent'
 import { FollowCameraComponent } from '@ir-engine/spatial/src/camera/components/FollowCameraComponent'
 import { FollowCameraMode } from '@ir-engine/spatial/src/camera/types/FollowCameraMode'
@@ -45,8 +45,7 @@ import { LineSegmentComponent } from '@ir-engine/spatial/src/renderer/components
 import { MeshComponent } from '@ir-engine/spatial/src/renderer/components/MeshComponent'
 import { VisibleComponent } from '@ir-engine/spatial/src/renderer/components/VisibleComponent'
 import { ComputedTransformComponent } from '@ir-engine/spatial/src/transform/components/ComputedTransformComponent'
-import { EntityTreeComponent } from '@ir-engine/spatial/src/transform/components/EntityTree'
-import { ObjectFitFunctions } from '@ir-engine/spatial/src/xrui/functions/ObjectFitFunctions'
+import { ObjectFitFunctions } from '@ir-engine/spatial/src/transform/functions/ObjectFitFunctions'
 import React, { useEffect } from 'react'
 import {
   BoxGeometry,
@@ -108,7 +107,7 @@ const UserWeaponReactor = (props: { userID: UserID }) => {
     /** @todo update based on FOV */
     if (isSelf) {
       setComponent(entity, TransformComponent, { position: new Vector3(0.15, -0.2, -0.5) })
-      setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).viewerEntity })
+      setComponent(entity, EntityTreeComponent, { parentEntity: getState(ReferenceSpaceState).viewerEntity })
     } else {
       const avatarEntity = AvatarComponent.getUserAvatarEntity(props.userID)
       setComponent(entity, TransformComponent, { position: new Vector3(0.15, -0.2, -0.5) })
@@ -164,7 +163,7 @@ const onPrimaryClick = () => {
   if (!physicsWorld) return
 
   const entity = createEntity()
-  const viewerEntity = getState(EngineState).viewerEntity
+  const viewerEntity = getState(ReferenceSpaceState).viewerEntity
   const cameraTransform = getComponent(viewerEntity, TransformComponent)
   raycastComponentData.excludeRigidBody = selfAvatarEntity
 
@@ -203,7 +202,7 @@ const onPrimaryClick = () => {
 
   setComponent(entity, UUIDComponent, ('Hitscan Tracker ' + hitscanEntityCounter) as EntityUUID)
   setComponent(entity, VisibleComponent)
-  setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).originEntity })
+  setComponent(entity, EntityTreeComponent, { parentEntity: getState(ReferenceSpaceState).originEntity })
 
   setComponent(entity, TransformComponent, {
     position: weaponPosition,
@@ -236,7 +235,7 @@ const swapHands = () => {
 }
 
 const execute = () => {
-  const viewerEntity = getState(EngineState).viewerEntity
+  const viewerEntity = getState(ReferenceSpaceState).viewerEntity
 
   const buttons = InputComponent.getMergedButtons(viewerEntity)
   if (buttons.PrimaryClick?.down) onPrimaryClick()
@@ -259,7 +258,7 @@ const WeaponReactor = (props: { viewerEntity: Entity }) => {
     setComponent(entity, NameComponent, 'Weapon Reticle')
     setComponent(entity, UUIDComponent, 'Weapon Reticle' as EntityUUID)
     setComponent(entity, VisibleComponent)
-    setComponent(entity, EntityTreeComponent, { parentEntity: getState(EngineState).localFloorEntity })
+    setComponent(entity, EntityTreeComponent, { parentEntity: getState(ReferenceSpaceState).localFloorEntity })
     setComponent(entity, ComputedTransformComponent, {
       referenceEntities: [props.viewerEntity],
       computeFunction: () => {
@@ -334,7 +333,7 @@ const WeaponSystem = defineSystem({
   insert: { with: InputSystemGroup },
   execute,
   reactor: () => {
-    const viewerEntity = useMutableState(EngineState).viewerEntity.value
+    const viewerEntity = useMutableState(ReferenceSpaceState).viewerEntity.value
     if (!viewerEntity) return null
 
     return <WeaponReactor viewerEntity={viewerEntity} />
